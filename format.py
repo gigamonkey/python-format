@@ -152,8 +152,38 @@ class Standard(Formatter):
         return pos + 1, False
 
 
+@directive('(')
+class CaseConversion(Formatter):
+    """
+    With no flags, every uppercase character is converted to the corresponding lowercase character.
+
+    ~:( capitalizes all words, as if by string-capitalize.
+
+    ~@( capitalizes just the first word and forces the rest to lower case.
+
+    ~:@( converts every lowercase character to the corresponding uppercase character.
+    """
+
+    def __init__(self, params, at, colon, formatters):
+        super().__init__(params, at, colon)
+        self.formatters = formatters
+
+    def emit(self, args, pos, newline, file):
+        s, p, nl = emit(self.formatters, args, pos, newline, file=None)
+
+        if not (self.at or self.colon):  s = s.lower()
+        elif self.colon and not self.at: s = string_capitalize(s)
+        elif self.at and not self.colon: s = s.capitalize()
+        elif self.at and self.colon:     s = s.upper()
+
+        print(s, end='', file=file)
+        return p, nl
+
+def string_capitalize(s):
+    return ''.join(s.capitalize() if re.fullmatch(r'\w+', s) else s for s in re.split(r'([^\w])', s))
+
 def format(spec, *args, **kwargs):
-    return emit(parse_spec(spec, 0), args, **kwargs)
+    return emit(parse_spec(spec, 0), args, 0, True, **kwargs)
 
 
 def parse_spec(spec, pos, end=None):
@@ -224,40 +254,25 @@ def parse_at_colon(spec, pos):
     return '@' in s, ':' in s, m.end()
 
 
-def emit(formatters, args, file=sys.stdout):
+def emit(formatters, args, pos, newline, file=sys.stdout):
     string_output = file is None
 
     if string_output:
         file = StringIO()
 
-    p, nl = 0, True
+    p, nl = pos, newline
     for f in formatters:
         p, nl = f.emit(args, p, nl, file)
 
     if string_output:
         text = file.getvalue()
         file.close()
-        return text
+        return text, p, nl
     else:
-        return None
-
-
+        return None, p, nl
 
 
 if __name__ == '__main__':
 
-    format('~&Hello: ~a ~r~&', 'Peter', 10)
+    format('~&Hello: ~(~a~) ~:@(~a~) ~@(~a~) ~:(~a~) ~r~&', 'Peter', 'fred', 'the quick brown fox', 'the quick brown fox', 10)
     exit()
-
-
-    formatters = [
-        Text('foo'),
-        Character([], False, False),
-        Newline([], False, False)
-    ]
-    args = ['a', 'bar']
-
-    emit(formatters, args, sys.stdout)
-
-    s = emit(formatters, args, None)
-    print('text: {}'.format(s))
