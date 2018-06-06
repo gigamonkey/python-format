@@ -7,39 +7,48 @@ import math
 import re
 import sys
 
-# TODO: v and # prefix parameters
+# TODO:
 
-# ~| : page feed (ignore)
+# 'v' and '#' prefix parameters
+
+# ~p : plural
+
 # ~r : numbers, in many variants
+
 # ~f : fixed float
 # ~e : exponential float
 # ~g : general float
 # ~$ : monetary float
-# ~a : aesthetic
-# ~s : standard (readable)
-# ~w : write (maybe not applicable)
+
 # ~_ : conditional newline
 # ~< : logical block
 # ~i : indent
+
 # ~/ : call function
+
 # ~t : tabulate
 # ~< : justification
 # ~> : end justfification
 # ~* : goto
+
 # ~[ : conditional expression
 # ~] : end conditional expression
 # ~{ : iteration
 # ~} : end iteration
-# ~? : recursive processing
-# ~( : case conversion
-# ~) : end case conversion
-# ~p : plural
 # ~; : clause separator
 # ~^ : escape upward
+
+# ~? : recursive processing
+
+
 # ~<newline> : ignored newline
+
 # ~u : lost u directive https://gigamonkeys.wordpress.com/2010/10/07/lost-u-directive/
 
+# PROBABLY DON'T IMPLEMENT
 
+# ~| : page feed (ignore)
+# ~w : write (maybe not applicable--very Lisp centric)
 
 ends     = {'[':']', '{':'}', '(':')'}
 arg_pat  = re.compile("(-?\d+)|('.)|()")
@@ -222,6 +231,7 @@ class Aesthetic(ObjectFormatter):
 class Standard(ObjectFormatter):
     def to_string(self, o): return repr(o)
 
+
 @directive('(')
 class CaseConversion(Formatter):
 
@@ -250,6 +260,23 @@ class CaseConversion(Formatter):
         print(s, end='', file=file)
         return p, nl
 
+@directive('p')
+class Plural(Formatter):
+    """
+    If arg is not eql to the integer 1, a lowercase s is printed; if arg is eql to 1, nothing is printed. If arg is a floating-point 1.0, the s is printed.
+    ~:P does the same thing, after doing a ~:* to back up one argument; that is, it prints a lowercase s if the previous argument was not 1.
+    ~@P prints y if the argument is 1, or ies if it is not. ~:@P does the same thing, but backs up first.
+    """
+
+    def emit(self, args, pos, newline, file):
+        if self.colon: pos -= 1
+        if args[pos] == 1:
+            ending = '' if not self.at else 'y'
+        else:
+            ending = 's' if not self.at else 'ies'
+        print(ending, end='', file=file)
+        return pos + 1, newline and ending == ''
+
 
 def print_padded(s, columns, pad_char, file):
     for i in range(columns - len(s)):
@@ -259,11 +286,6 @@ def print_padded(s, columns, pad_char, file):
 
 def string_capitalize(s):
     return ''.join(s.capitalize() if re.fullmatch(r'\w+', s) else s for s in re.split(r'([^\w])', s))
-
-
-def format(spec, *args, **kwargs):
-    s, _, _ = emit(parse_spec(spec, 0), args, 0, True, **kwargs)
-    return s
 
 
 def parse_spec(spec, pos, end=None):
@@ -356,6 +378,12 @@ def emit(formatters, args, pos, newline, file=sys.stdout):
         return None, p, nl
 
 
+def format(spec, *args, **kwargs):
+    "Emit formatted output."
+    s, _, _ = emit(parse_spec(spec, 0), args, 0, True, **kwargs)
+    return s
+
+
 if __name__ == '__main__':
 
     def check(spec, args, expected):
@@ -389,3 +417,7 @@ if __name__ == '__main__':
     check('~:(~a~)', ['The quick brown fox'], 'The Quick Brown Fox')
     check('~@(~a~)', ['The quick brown fox'], 'The quick brown fox')
     check('~:@(~a~)', ['The quick brown fox'], 'THE QUICK BROWN FOX')
+    check("pig~p", [1], "pig")
+    check("pig~p", [10], "pigs")
+    check("~d pig~:p", [1], "1 pig")
+    check("~d pig~:p", [10], "10 pigs")
