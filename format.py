@@ -244,6 +244,36 @@ class Goto(Formatter):
             return pos - n if self.colon else pos + n, newline
 
 
+@directive('[')
+class Conditional(Formatter):
+
+    def __init__(self, params, at, colon, formatters):
+        super().__init__(params, at, colon)
+        start = 0
+        delim = None
+        self.delimiters = []
+        self.clauses = []
+        for i, f in enumerate(formatters):
+            if isinstance(f, Semicolon):
+                self.delimiters.append(delim)
+                self.clauses.append(formatters[start:i])
+                delim = f
+                start = i + 1
+        self.delimiters.append(delim)
+        self.clauses.append(formatters[start:])
+
+    def emit(self, args, pos, newline, file):
+        if not (self.at or self.colon):
+            return emit(self.clauses[args[pos]], args, pos + 1, newline, file=file)[1:]
+
+@directive(';')
+class Semicolon(Formatter):
+
+    def emit(self, args, pos, newline, file):
+        raise Exception("Trying to emit a delimiter.")
+
+
+
 @directive('(')
 class CaseConversion(Formatter):
 
@@ -433,3 +463,6 @@ if __name__ == '__main__':
     check("~d ~d ~d ~@*~d ~d ~d", [1, 2, 3], "1 2 3 1 2 3")
     check("~d ~d ~d ~:*~d", [1, 2, 3], "1 2 3 3")
     check("~d ~*~d", [1, 2, 3], "1 3")
+    check("~[Siamese~;Manx~;Persian~] Cat", [0], "Siamese Cat")
+    check("~[Siamese~;Manx~;Persian~] Cat", [1], "Manx Cat")
+    check("~[Siamese~;Manx~;Persian~] Cat", [2], "Persian Cat")
