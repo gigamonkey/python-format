@@ -3,6 +3,7 @@
 import re
 import sys
 from io import StringIO
+from itertools import zip_longest
 
 # TODO: v and # prefix parameters
 
@@ -47,7 +48,7 @@ from io import StringIO
 
 
 ends     = {'[':']', '{':'}', '(':')'}
-arg_pat  = re.compile("(-?\d+)|('.)")
+arg_pat  = re.compile("(-?\d+)|('.)|()")
 at_colon = re.compile('[:@]{0,2}')
 
 classes = {}
@@ -69,6 +70,12 @@ class Formatter:
 
     def __repr__(self):
         return '<{} {} at: {}; colon: {}>'.format(self.__class__.__name__, self.params, self.at, self.colon)
+
+    def param(self, idx, default):
+        return self.params[idx] if idx < len(self.params) else default
+
+    def get_params(self, *defaults):
+        return list(a or b for a, b in zip_longest(self.params, defaults))
 
     def emit(self, args, pos, newline, file):
         """
@@ -111,7 +118,7 @@ class Newline(Formatter):
     "~% : newline formatter"
 
     def emit(self, args, pos, newline, file):
-        times = self.params[0] if self.params else 1
+        times = self.get_params(1)[0]
         for i in range(times):
             print('', file=file)
         return pos, True
@@ -135,6 +142,17 @@ class Number(Formatter):
         print(args[pos], end='', file=file)
         return pos + 1, False
 
+
+@directive('d')
+class Decimal(Formatter):
+
+    def emit(self, args, pos, newline, file):
+        n = args[pos]
+        col, pad, comma, comma_int = self.get_params(0, ' ', ',', 3)
+        sign = '-' if n < 0 else ('+' if self.at else '')
+        base = sign + (commafy(n, comma, comma_int) if self.colon else repr(n))
+        print_padded(base, col, pad, file)
+        return pos + 1, False
 
 @directive('a')
 class Aesthetic(Formatter):
@@ -179,11 +197,30 @@ class CaseConversion(Formatter):
         print(s, end='', file=file)
         return p, nl
 
+
+def print_padded(s, columns, pad_char, file):
+    for i in range(columns - len(s)):
+        print(pad_char, end='', file=file)
+    print(s, end='', file=file)
+
+
+def commafy(n, comma, comma_int):
+    n = abs(n)
+    e = 10 ** comma_int
+
+    s = str(n % e)
+    n = n // e
+    while n > 0:
+        s = str(n % e) + comma + s
+        n = n // e
+    return s
+
 def string_capitalize(s):
     return ''.join(s.capitalize() if re.fullmatch(r'\w+', s) else s for s in re.split(r'([^\w])', s))
 
 def format(spec, *args, **kwargs):
-    return emit(parse_spec(spec, 0), args, 0, True, **kwargs)
+    s, _, _ = emit(parse_spec(spec, 0), args, 0, True, **kwargs)
+    return s
 
 
 def parse_spec(spec, pos, end=None):
@@ -238,7 +275,12 @@ def parse_args(spec, pos):
     while p < len(spec):
         m = arg_pat.match(spec, p)
         if m:
-            args.append(int(m.group(1)) if m.group(1) else m.group(2)[1])
+            if m.group(1):
+                args.append(int(m.group(1)))
+            elif m.group(2):
+                args.append(m.group(2)[1])
+            else:
+                args.append(None)
             p = m.end()
 
         if spec[p] != ',':
@@ -274,5 +316,23 @@ def emit(formatters, args, pos, newline, file=sys.stdout):
 
 if __name__ == '__main__':
 
-    format('~&Hello: ~(~a~) ~:@(~a~) ~@(~a~) ~:(~a~) ~r~&', 'Peter', 'fred', 'the quick brown fox', 'the quick brown fox', 10)
-    exit()
+    def check(spec, args, expected):
+        out = format(spec, *args, file=None)
+        if out != expected:
+            print('FAIL: format("{}", {}) returned "{}" expected "{}"'.format(spec, args, out, expected))
+        else:
+            print('PASS: format("{}", {})'.format(spec, args))
+
+    check('~&Hello', [], 'Hello')
+    check('~%Hello', [], '\nHello')
+    check('~a', [10], '10')
+    check('~s', [10], '10')
+    check('~(~a~)', ['The quick brown fox'], 'the quick brown fox')
+    check('~:(~a~)', ['The quick brown fox'], 'The Quick Brown Fox')
+    check('~@(~a~)', ['The quick brown fox'], 'The quick brown fox')
+    check('~:@(~a~)', ['The quick brown fox'], 'THE QUICK BROWN FOX')
+    check('~:d', [1234567], '1,234,567')
+    check("~,,'.,4:d", [1234567], '123.4567')
+    check("~2,'0d", [3], '03')
+    check("~4,'0d-~2,'0d-~2,'0d", [2018, 6, 5], '2018-06-05')
+    check("~10d", [123], "       123")
