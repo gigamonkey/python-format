@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 
-import re
-import sys
 from io import StringIO
 from itertools import zip_longest
+
+import math
+import re
+import sys
 
 # TODO: v and # prefix parameters
 
@@ -187,24 +189,42 @@ class Hex(IntegerFormatter):
     fmt = '{:x}'
 
 
-@directive('a')
-class Aesthetic(Formatter):
+class ObjectFormatter(Formatter):
+
+    """
+    ~mincolA inserts spaces on the right, if necessary, to make the
+    width at least mincol columns. The @ modifier causes the spaces
+    to be inserted on the left rather than the right.
+
+    ~mincol,colinc,minpad,padcharA is the full form of ~A, which
+    allows control of the padding. The string is padded on the right
+    (or on the left if the @ modifier is used) with at least minpad
+    copies of padchar; padding characters are then inserted colinc
+    characters at a time until the total width is at least mincol. The
+    defaults are 0 for mincol and minpad, 1 for colinc, and the space
+    character for padchar.
+    """
 
     def emit(self, args, pos, newline, file):
-        print(str(args[pos]), end='', file=file)
-        return pos + 1, False
+        mincol, colinc, minpad, padchar = self.get_params(0, 1, 0, ' ')
+        s = self.to_string(args[pos])
+        padding = padchar * (minpad + (colinc * math.ceil((mincol - (len(s) + minpad))/colinc)))
+        text = padding + s if self.at else s + padding
+        print(text, end='', file=file)
+        return pos + 1, text[-1] == '\n'
+
+@directive('a')
+class Aesthetic(ObjectFormatter):
+    def to_string(self, o): return str(o)
 
 
 @directive('s')
-class Standard(Formatter):
-
-    def emit(self, args, pos, newline, file):
-        print(repr(args[pos]), end='', file=file)
-        return pos + 1, False
-
+class Standard(ObjectFormatter):
+    def to_string(self, o): return repr(o)
 
 @directive('(')
 class CaseConversion(Formatter):
+
     """
     With no flags, every uppercase character is converted to the corresponding lowercase character.
 
@@ -347,12 +367,6 @@ if __name__ == '__main__':
 
     check('~&Hello', [], 'Hello')
     check('~%Hello', [], '\nHello')
-    check('~a', [10], '10')
-    check('~s', [10], '10')
-    check('~(~a~)', ['The quick brown fox'], 'the quick brown fox')
-    check('~:(~a~)', ['The quick brown fox'], 'The Quick Brown Fox')
-    check('~@(~a~)', ['The quick brown fox'], 'The quick brown fox')
-    check('~:@(~a~)', ['The quick brown fox'], 'THE QUICK BROWN FOX')
     check('~:d', [1234567], '1,234,567')
     check("~,,'.,4:d", [1234567], '123.4567')
     check("~2,'0d", [3], '03')
@@ -365,3 +379,13 @@ if __name__ == '__main__':
     check("~o", [1234], "2322")
     check("~x", [0xcafebabe], "cafebabe")
     check("~:@(~x~)", [0xcafebabe], "CAFEBABE")
+    check('~a', [10], '10')
+    check('~10a', [10], '10        ')
+    check('~10@a', [10], '        10')
+    check('~s', [10], '10')
+    check('~10s', [10], '10        ')
+    check('~10@s', [10], '        10')
+    check('~(~a~)', ['The quick brown fox'], 'the quick brown fox')
+    check('~:(~a~)', ['The quick brown fox'], 'The Quick Brown Fox')
+    check('~@(~a~)', ['The quick brown fox'], 'The quick brown fox')
+    check('~:@(~a~)', ['The quick brown fox'], 'THE QUICK BROWN FOX')
