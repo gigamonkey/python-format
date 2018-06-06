@@ -7,16 +7,8 @@ from itertools import zip_longest
 
 # TODO: v and # prefix parameters
 
-# ~c : character
-# ~% : newline
-# ~& : freshline
 # ~| : page feed (ignore)
-# ~~ : tilde
 # ~r : numbers, in many variants
-# ~d : decimal integer
-# ~b : binary integer
-# ~o : octal integer
-# ~x : hex integer
 # ~f : fixed float
 # ~e : exponential float
 # ~g : general float
@@ -105,7 +97,7 @@ class Text(Formatter):
 @directive('c')
 class Character(Formatter):
 
-    "~c: character formatter"
+    "~c: character formatter. We don't bother with all the options since they are pretty Lisp specific."
 
     def emit(self, args, pos, newline, file):
         print(args[pos], end='', file=file)
@@ -130,7 +122,10 @@ class Freshline(Formatter):
     "~& : freshline"
 
     def emit(self, args, pos, newline, file):
+        times = self.get_params(1)[0]
         if not newline:
+            print('', file=file)
+        for i in range(times - 1):
             print('', file=file)
         return pos, True
 
@@ -143,16 +138,54 @@ class Number(Formatter):
         return pos + 1, False
 
 
-@directive('d')
-class Decimal(Formatter):
+class IntegerFormatter(Formatter):
+
+    def to_string(self, n, padded, e):
+        return self.fmt.format(e + n)[1:] if padded else self.fmt.format(n)
+
+    def commafy(self, n, comma, comma_int):
+        n = abs(n)
+        e = self.base ** comma_int
+
+        s = self.to_string(n % e, n >= e, e)
+        n = n // e
+        while n > 0:
+            s = self.to_string(n % e, n >= e, e) + comma + s
+            n = n // e
+        return s
 
     def emit(self, args, pos, newline, file):
         n = args[pos]
         col, pad, comma, comma_int = self.get_params(0, ' ', ',', 3)
         sign = '-' if n < 0 else ('+' if self.at else '')
-        base = sign + (commafy(n, comma, comma_int) if self.colon else repr(n))
+        base = sign + (self.commafy(n, comma, comma_int) if self.colon else self.to_string(n, False, 0))
         print_padded(base, col, pad, file)
         return pos + 1, False
+
+
+@directive('d')
+class Decimal(IntegerFormatter):
+    base = 10
+    fmt = '{:d}'
+
+
+@directive('b')
+class Binary(IntegerFormatter):
+    base = 2
+    fmt = '{:b}'
+
+
+@directive('o')
+class Octal(IntegerFormatter):
+    base = 8
+    fmt = '{:o}'
+
+
+@directive('x')
+class Hex(IntegerFormatter):
+    base = 16
+    fmt = '{:x}'
+
 
 @directive('a')
 class Aesthetic(Formatter):
@@ -204,19 +237,9 @@ def print_padded(s, columns, pad_char, file):
     print(s, end='', file=file)
 
 
-def commafy(n, comma, comma_int):
-    n = abs(n)
-    e = 10 ** comma_int
-
-    s = str(n % e)
-    n = n // e
-    while n > 0:
-        s = str(n % e) + comma + s
-        n = n // e
-    return s
-
 def string_capitalize(s):
     return ''.join(s.capitalize() if re.fullmatch(r'\w+', s) else s for s in re.split(r'([^\w])', s))
+
 
 def format(spec, *args, **kwargs):
     s, _, _ = emit(parse_spec(spec, 0), args, 0, True, **kwargs)
@@ -224,7 +247,6 @@ def format(spec, *args, **kwargs):
 
 
 def parse_spec(spec, pos, end=None):
-
     formatters = []
     p_start = pos
     p = pos
@@ -336,3 +358,10 @@ if __name__ == '__main__':
     check("~2,'0d", [3], '03')
     check("~4,'0d-~2,'0d-~2,'0d", [2018, 6, 5], '2018-06-05')
     check("~10d", [123], "       123")
+    check("~:d", [1000000], "1,000,000")
+    check("~b", [100], "1100100")
+    check("~b", [12341234213], "1011011111100110000100101000100101")
+    check("~,,' ,4:b", [12341234213], "10 1101 1111 1001 1000 0100 1010 0010 0101")
+    check("~o", [1234], "2322")
+    check("~x", [0xcafebabe], "cafebabe")
+    check("~:@(~x~)", [0xcafebabe], "CAFEBABE")
