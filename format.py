@@ -232,6 +232,17 @@ class Standard(ObjectFormatter):
     def to_string(self, o): return repr(o)
 
 
+@directive('*')
+class Goto(Formatter):
+
+    def emit(self, args, pos, newline, file):
+        n = self.get_params(0 if self.at else 1)[0]
+        if self.at:
+            return n, newline
+        else:
+            return pos - n if self.colon else pos + n, newline
+
+
 @directive('(')
 class CaseConversion(Formatter):
 
@@ -421,3 +432,6 @@ if __name__ == '__main__':
     check("pig~p", [10], "pigs")
     check("~d pig~:p", [1], "1 pig")
     check("~d pig~:p", [10], "10 pigs")
+    check("~d ~d ~d ~@*~d ~d ~d", [1, 2, 3], "1 2 3 1 2 3")
+    check("~d ~d ~d ~:*~d", [1, 2, 3], "1 2 3 3")
+    check("~d ~*~d", [1, 2, 3], "1 3")
