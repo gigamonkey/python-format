@@ -167,10 +167,11 @@ class IntegerFormatter(Formatter):
 
     def emit(self, args, pos, newline, file):
         n = args[pos]
-        col, pad, comma, comma_int = self.get_params(0, ' ', ',', 3)
+        col, padchar, comma, comma_int = self.get_params(0, ' ', ',', 3)
         sign = '-' if n < 0 else ('+' if self.at else '')
         base = sign + (self.commafy(n, comma, comma_int) if self.colon else self.to_string(n, False, 0))
-        print_padded(base, col, pad, file)
+        print(padchar * (col - len(base)), end='', file=file)
+        print(base, end='', file=file)
         return pos + 1, False
 
 
@@ -271,6 +272,9 @@ class CaseConversion(Formatter):
         print(s, end='', file=file)
         return p, nl
 
+def string_capitalize(s):
+    return ''.join(s.capitalize() if re.fullmatch(r'\w+', s) else s for s in re.split(r'([^\w])', s))
+
 @directive('p')
 class Plural(Formatter):
     """
@@ -289,14 +293,8 @@ class Plural(Formatter):
         return pos + 1, newline and ending == ''
 
 
-def print_padded(s, columns, pad_char, file):
-    for i in range(columns - len(s)):
-        print(pad_char, end='', file=file)
-    print(s, end='', file=file)
 
 
-def string_capitalize(s):
-    return ''.join(s.capitalize() if re.fullmatch(r'\w+', s) else s for s in re.split(r'([^\w])', s))
 
 
 def parse_spec(spec, pos, end=None):
