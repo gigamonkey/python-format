@@ -268,10 +268,18 @@ class Conditional(Formatter):
                 clause = self.clauses[args[pos]]
             else:
                 clause = self.clauses[-1] if self.delimiters[-1].colon else []
+            return emit(clause, args, pos + 1, newline, file=file)[1:]
+
         elif self.colon and not self.at:
             clause = self.clauses[1] if args[pos] else self.clauses[0]
+            return emit(clause, args, pos + 1, newline, file=file)[1:]
 
-        return emit(clause, args, pos + 1, newline, file=file)[1:]
+        elif self.at and not self.colon:
+            if args[pos]:
+                return emit(self.clauses[0], args, pos, newline, file=file)[1:]
+            else:
+                return pos + 1, newline
+
 
 
 @directive(';')
@@ -433,11 +441,18 @@ def format(spec, *args, **kwargs):
 
 if __name__ == '__main__':
 
+    passed = 0
+    failed = 0
+
     def check(spec, args, expected):
         out = format(spec, *args, file=None)
         if out != expected:
+            global failed
+            failed += 1
             print('FAIL: format("{}", {}) returned "{}" expected "{}"'.format(spec, args, out, expected))
         else:
+            global passed
+            passed += 1
             print('PASS: format("{}", {})'.format(spec, args))
 
     check('~&Hello', [], 'Hello')
@@ -480,3 +495,7 @@ if __name__ == '__main__':
     check("~[Siamese~;Manx~;Persian~:;Alley~] Cat", [100], "Alley Cat")
     check("~:[No~;Yes~]", [True], "Yes")
     check("~:[No~;Yes~]", [False], "No")
+    check("~@[truthy value ~a~]", [100], "truthy value 100")
+    check("~@[truthy value ~a~]", [False], "")
+    check("~@[truthy value ~a~]", [None], "")
+    format("~&~:[Uh oh.~;All Okay!~] ~:d passed; ~:d failed~%", failed == 0, passed, failed)
