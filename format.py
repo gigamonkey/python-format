@@ -264,7 +264,11 @@ class Conditional(Formatter):
 
     def emit(self, args, pos, newline, file):
         if not (self.at or self.colon):
-            return emit(self.clauses[args[pos]], args, pos + 1, newline, file=file)[1:]
+            if args[pos] < len(self.clauses):
+                clause = self.clauses[args[pos]]
+            else:
+                clause = self.clauses[-1] if self.delimiters[-1].colon else []
+            return emit(clause, args, pos + 1, newline, file=file)[1:]
 
 @directive(';')
 class Semicolon(Formatter):
@@ -466,3 +470,7 @@ if __name__ == '__main__':
     check("~[Siamese~;Manx~;Persian~] Cat", [0], "Siamese Cat")
     check("~[Siamese~;Manx~;Persian~] Cat", [1], "Manx Cat")
     check("~[Siamese~;Manx~;Persian~] Cat", [2], "Persian Cat")
+    check("~[Siamese~;Manx~;Persian~:;Alley~] Cat", [2], "Persian Cat")
+    check("~[Siamese~;Manx~;Persian~:;Alley~] Cat", [3], "Alley Cat")
+    check("~[Siamese~;Manx~;Persian~:;Alley~] Cat", [5], "Alley Cat")
+    check("~[Siamese~;Manx~;Persian~:;Alley~] Cat", [100], "Alley Cat")
