@@ -268,7 +268,11 @@ class Conditional(Formatter):
                 clause = self.clauses[args[pos]]
             else:
                 clause = self.clauses[-1] if self.delimiters[-1].colon else []
-            return emit(clause, args, pos + 1, newline, file=file)[1:]
+        elif self.colon and not self.at:
+            clause = self.clauses[1] if args[pos] else self.clauses[0]
+
+        return emit(clause, args, pos + 1, newline, file=file)[1:]
+
 
 @directive(';')
 class Semicolon(Formatter):
@@ -474,3 +478,5 @@ if __name__ == '__main__':
     check("~[Siamese~;Manx~;Persian~:;Alley~] Cat", [3], "Alley Cat")
     check("~[Siamese~;Manx~;Persian~:;Alley~] Cat", [5], "Alley Cat")
     check("~[Siamese~;Manx~;Persian~:;Alley~] Cat", [100], "Alley Cat")
+    check("~:[No~;Yes~]", [True], "Yes")
+    check("~:[No~;Yes~]", [False], "No")
