@@ -9,9 +9,14 @@ import sys
 
 # TODO:
 
-# 'v' and '#' prefix parameters
+# ~{ : iteration
+# ~} : end iteration
+# ~; : clause separator
+# ~^ : escape upward
 
-# ~p : plural
+# ~? : recursive processing
+
+# 'v' and '#' prefix parameters
 
 # ~r : numbers, in many variants
 
@@ -20,30 +25,21 @@ import sys
 # ~g : general float
 # ~$ : monetary float
 
-# ~_ : conditional newline
-# ~< : logical block
-# ~i : indent
-
 # ~/ : call function
 
 # ~t : tabulate
 # ~< : justification
 # ~> : end justfification
-# ~* : goto
 
-# ~[ : conditional expression
-# ~] : end conditional expression
-# ~{ : iteration
-# ~} : end iteration
-# ~; : clause separator
-# ~^ : escape upward
-
-# ~? : recursive processing
+# ~_ : conditional newline
+# ~< : logical block
+# ~i : indent
 
 
 # ~<newline> : ignored newline
 
 # ~u : lost u directive https://gigamonkeys.wordpress.com/2010/10/07/lost-u-directive/
+
 
 # PROBABLY DON'T IMPLEMENT
 
