@@ -297,11 +297,27 @@ class Iteration(Formatter):
         self.formatters = formatters
 
     def emit(self, args, pos, newline, file):
-        if not formatters:
-            self.formatters.append(args[pos])
+        if not self.formatters:
+            formatters = parse_spec(args[pos], 0)
             pos += 1
-        newargs = args[pos]
-        pass
+        else:
+            formatters = self.formatters
+
+        list_args = args[pos]
+        p = 0
+        nl = newline
+        while p < len(list_args):
+            _, p, nl = emit(formatters, list_args, p, nl, file=file)
+
+        return p, nl
+
+
+@end_directive('{', '}')
+class EndIteration(Formatter):
+
+    def emit(self, args, pos, newline, file):
+        raise Exception("Trying to emit EndIteration.")
+
 
 
 @directive(';')
@@ -522,4 +538,9 @@ if __name__ == '__main__':
     check("~@[truthy value ~a~]", [100], "truthy value 100")
     check("~@[truthy value ~a~]", [False], "")
     check("~@[truthy value ~a~]", [None], "")
+    check("~{~a ~}", [[1, 2, 3]], "1 2 3 ")
+    check("~{~}", ["~a ", [1, 2, 3]], "1 2 3 ")
+    check("~{<~a, ~a> ~}", [[1, 2, 3, 4]], "<1, 2> <3, 4> ")
+
+
     format("~&~:[Uh oh.~;All Okay!~] ~:d passed; ~:d failed~%", failed == 0, passed, failed)
