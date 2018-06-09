@@ -329,18 +329,22 @@ class EndIteration(Formatter):
         raise Exception("Trying to emit EndIteration.")
 
 
-
 @directive(';')
 class Semicolon(Formatter):
 
     def emit(self, args, pos, newline, file):
         raise Exception("Trying to emit a delimiter.")
 
+
 @directive('^')
 class EscapeUpward(Formatter):
 
     def emit(self, args, pos, newline, file):
-        raise StopIteration()
+        if len(args) - pos == 0:
+            raise StopIteration()
+        else:
+            return pos, newline
+
 
 
 
@@ -559,7 +563,7 @@ if __name__ == '__main__':
     check("~{<~a, ~a> ~}", [[1, 2, 3, 4]], "<1, 2> <3, 4> ")
     check("~1{~a ~}", [[1, 2, 3]], "1 ")
     check("~2{~a ~}", [[1, 2, 3]], "1 2 ")
-    check("~{~a~^~}", [[1, 2, 3]], "1")
-
+    check("~{~a~^~}", [[1, 2, 3]], "123")
+    check("~{~a~^ ~}", [[1, 2, 3]], "1 2 3")
 
     format("~&~:[Uh oh.~;All Okay!~] ~:d passed; ~:d failed~%", failed == 0, passed, failed)
