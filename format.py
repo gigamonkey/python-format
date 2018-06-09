@@ -306,21 +306,30 @@ class Iteration(Formatter):
         n = self.get_params(None)[0]
 
         list_args = args[pos]
-        p         = 0
         nl        = newline
-        iters     = 0
 
-        try:
-            while p < len(list_args):
-                _, p, nl = emit(formatters, list_args, p, nl, file=file)
-                iters += 1
-                if n and iters == n:
-                    break
-        except StopIteration:
-            pass
+        if not (self.colon or self.at):
+            p     = 0
+            nl    = newline
+            iters = 0
+            try:
+                while p < len(list_args):
+                    _, p, nl = emit(formatters, list_args, p, nl, file=file)
+                    iters += 1
+                    if n and iters == n:
+                        break
+            except StopIteration:
+                pass
 
-        return p, nl
-
+            return p, nl
+        elif self.colon:
+            for arg in list_args:
+                p = 0
+                try:
+                    _, p, nl = emit(formatters, arg, p, nl, file=file)
+                except StopIteration:
+                    pass
+            return p, nl
 
 @end_directive('{', '}')
 class EndIteration(Formatter):
@@ -344,8 +353,6 @@ class EscapeUpward(Formatter):
             raise StopIteration()
         else:
             return pos, newline
-
-
 
 
 @directive('(')
@@ -565,5 +572,7 @@ if __name__ == '__main__':
     check("~2{~a ~}", [[1, 2, 3]], "1 2 ")
     check("~{~a~^~}", [[1, 2, 3]], "123")
     check("~{~a~^ ~}", [[1, 2, 3]], "1 2 3")
+    check("~:{<~a, ~a> ~}", [[[1, 2], [3, 4, 5, 6]]], "<1, 2> <3, 4> ")
+    check("~:{<~a~^> ~}", [[[1, 2], [3, 4, 5, 6]]], "<1> <3> ")
 
     format("~&~:[Uh oh.~;All Okay!~] ~:d passed; ~:d failed~%", failed == 0, passed, failed)
