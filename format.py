@@ -46,16 +46,22 @@ import sys
 # ~| : page feed (ignore)
 # ~w : write (maybe not applicable--very Lisp centric)
 
-ends     = {'[':']', '{':'}', '(':')'}
 arg_pat  = re.compile("(-?\d+)|('.)|()")
 at_colon = re.compile('[:@]{0,2}')
 
+ends    = {}
 classes = {}
 
 def directive(char):
     def decorator(clazz):
         classes[char.lower()] = clazz
         return clazz
+    return decorator
+
+def end_directive(open, close):
+    def decorator(clazz):
+        classes[close.lower()] = clazz
+        ends[open.lower()] = clazz
     return decorator
 
 class Formatter:
@@ -276,6 +282,26 @@ class Conditional(Formatter):
             else:
                 return pos + 1, newline
 
+@end_directive('[', ']')
+class EndConditional(Formatter):
+
+    def emit(self, args, pos, newline, file):
+        raise Exception("Trying to emit EndConditional.")
+
+
+@directive('{')
+class Iteration(Formatter):
+
+    def __init__(self, params, at, colon, formatters):
+        super().__init__(params, at, colon)
+        self.formatters = formatters
+
+    def emit(self, args, pos, newline, file):
+        if not formatters:
+            self.formatters.append(args[pos])
+            pos += 1
+        newargs = args[pos]
+        pass
 
 
 @directive(';')
@@ -314,6 +340,14 @@ class CaseConversion(Formatter):
         print(s, end='', file=file)
         return p, nl
 
+
+@end_directive('(', ')')
+class EndCaseConversion(Formatter):
+
+    def emit(self, args, pos, newline, file):
+        raise Exception("Trying to emit EndCaseConversion.")
+
+
 def string_capitalize(s):
     return ''.join(s.capitalize() if re.fullmatch(r'\w+', s) else s for s in re.split(r'([^\w])', s))
 
@@ -335,10 +369,6 @@ class Plural(Formatter):
         return pos + 1, newline and ending == ''
 
 
-
-
-
-
 def parse_spec(spec, pos, end=None):
     formatters = []
     p_start = pos
@@ -349,12 +379,13 @@ def parse_spec(spec, pos, end=None):
             if p > p_start:
                 formatters.append(Text(spec[p_start:p]))
 
-            if p + 1 < len(spec) and spec[p + 1] == end:
-                return formatters, p + 2
+            formatter, p = parse_directive(spec, p + 1, end)
+            p_start = p
+            if end and isinstance(formatter, end):
+                return formatters, p, formatter.colon
             else:
-                formatter, p = parse_directive(spec, p + 1, end)
-                p_start = p
                 formatters.append(formatter)
+
         else:
             p += 1
 
@@ -365,7 +396,6 @@ def parse_spec(spec, pos, end=None):
 
 
 def parse_directive(spec, pos, end):
-
     args, p      = parse_args(spec, pos)
     at, colon, p = parse_at_colon(spec, p)
 
@@ -374,10 +404,8 @@ def parse_directive(spec, pos, end):
     if char == '~':
         return Text('~'), p + 1
     elif char in '[{(':
-        formatters, p = parse_spec(spec, p + 1, end=ends[char])
+        formatters, p, end_colon = parse_spec(spec, p + 1, end=ends[char])
         return classes[char](args, at, colon, formatters), p
-    elif char in ']})':
-        raise Exception("Unexpected ~{}".char)
     else:
         return classes[char](args, at, colon), p + 1
 
